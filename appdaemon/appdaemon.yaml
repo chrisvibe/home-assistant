@@ -1,0 +1,10 @@
+appdaemon:
+  plugins:
+    HASS:
+      type: hass
+      ha_url: http://homeassistant:8123
+      token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiIzOTEzMGRlNmM4ZGM0YTIzYWRkOGIyY2IzODVhOTgyMyIsImlhdCI6MTc0NDMxNTk3OCwiZXhwIjoyMDU5Njc1OTc4fQ.1tjXly_buGUTrlLAdaGveP2SnQ6MaQZEDn9ElB8bMrk
+  time_zone: Europe/Oslo
+  latitude: 59.23376703717582
+  longitude: 10.937433663768132
+  elevation: 0 

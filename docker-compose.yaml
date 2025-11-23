@@ -1,0 +1,58 @@
+services:
+  mqtt:
+    image: eclipse-mosquitto:2.0
+    container_name: mqtt
+    volumes:
+      - "./mosquitto-data:/mosquitto"
+    ports:
+      - "1883:1883"  # unencypted mqtt
+      - "9001:9001"  # HTTP/Websocket protocol
+    command: "mosquitto -c /mosquitto/mosquitto-no-auth.conf" # overrrides default conf file from image with file in volume
+    restart: unless-stopped
+
+  zigbee2mqtt:
+    image: koenkk/zigbee2mqtt:2.6.3
+    container_name: zigbee2mqtt
+    volumes:
+      - ./zigbee2mqtt-data:/app/data
+      - /run/udev:/run/udev:ro
+    ports:
+      - 8080:8080
+    environment:
+      - TZ=Europe/Berlin
+    devices:
+      - /dev/ttyUSB0:/dev/ttyUSB0
+    restart: unless-stopped
+    depends_on:
+      - mqtt
+
+  homeassistant:
+    container_name: homeassistant
+    image: ghcr.io/home-assistant/home-assistant:2025.11.3
+    volumes:
+      - ${CONFIG_PATH}:/config
+      - ${BACKUP_PATH}:/config/backups
+      - /etc/localtime:/etc/localtime:ro
+      - /run/dbus:/run/dbus:ro
+      - ${MOVIES_PATH}:/media/movies:ro
+    devices:
+      - /dev/ttyUSB0:/dev/ttyUSB0
+    restart: unless-stopped
+    privileged: true
+    ports:
+      - 8123:8123 # web ui
+      - 1400:1400 # sonos event subscriptions
+      - 1900:1900/udp  # SSDP for discovery (consider macvlan approach if breaking)
+      - 5353:5353/udp  # mDNS for discovery
+    depends_on:
+      - zigbee2mqtt
+
+  appdaemon:
+    build: ./appdaemon
+    container_name: appdaemon
+    volumes:
+      - ./appdaemon:/conf
+    environment:
+      - HA_URL=${HA_URL}
+      - TOKEN=${HA_TOKEN}
+    restart: unless-stopped

@@ -1,0 +1,40 @@
+# Environment variables
+.env
+
+# Docker override (symlink to infrastructure repo)
+docker-compose.override.yaml
+
+# Home Assistant data
+home_assistant/
+!home_assistant/.gitkeep
+
+# MQTT data
+mosquitto-data/
+
+# Zigbee2MQTT data
+zigbee2mqtt-data/
+zigbeeOTA/
+
+# AppDaemon
+appdaemon/__pycache__/
+appdaemon/*.pyc
+appdaemon/compiled/
+
+# Secrets
+appdaemon/secrets.yaml
+home_assistant/secrets.yaml
+
+# Backups
+*.txt
+backups/
+legacy/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Other
+config
