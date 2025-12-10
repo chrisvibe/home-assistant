@@ -11,7 +11,7 @@ services:
     restart: unless-stopped
 
   zigbee2mqtt:
-    image: koenkk/zigbee2mqtt:2.6.3
+    image: koenkk/zigbee2mqtt:2.7
     container_name: zigbee2mqtt
     volumes:
       - ./zigbee2mqtt-data:/app/data
@@ -28,7 +28,7 @@ services:
 
   homeassistant:
     container_name: homeassistant
-    image: ghcr.io/home-assistant/home-assistant:2025.11.3
+    image: ghcr.io/home-assistant/home-assistant:2025.12
     volumes:
       - ${CONFIG_PATH}:/config
       - ${BACKUP_PATH}:/config/backups
