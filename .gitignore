@@ -16,12 +16,18 @@ zigbee2mqtt-data/
 zigbeeOTA/
 
 # AppDaemon
-appdaemon/__pycache__/
-appdaemon/*.pyc
 appdaemon/compiled/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
 
 # Secrets
 appdaemon/secrets.yaml
+appdaemon/apps/apps.yaml
 home_assistant/secrets.yaml
 
 # Backups
