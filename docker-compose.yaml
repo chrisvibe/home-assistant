@@ -14,7 +14,8 @@ services:
     image: koenkk/zigbee2mqtt:2.7
     container_name: zigbee2mqtt
     volumes:
-      - ./zigbee2mqtt-data:/app/data
+      #- ./zigbee2mqtt-data:/app/data
+      - ha_zigbee2mqtt:/app/data
       - /run/udev:/run/udev:ro
     ports:
       - 8080:8080
@@ -28,15 +29,16 @@ services:
 
   homeassistant:
     container_name: homeassistant
-    image: ghcr.io/home-assistant/home-assistant:2025.12
+      # image: ghcr.io/home-assistant/home-assistant:2026.3.2
+    image: ghcr.io/home-assistant/home-assistant:2026.4.1
     volumes:
-      - ${CONFIG_PATH}:/config
-      - ${BACKUP_PATH}:/config/backups
+      - ha_data:/config
+      - ha_backups:/backups
       - /etc/localtime:/etc/localtime:ro
       - /run/dbus:/run/dbus:ro
       - ${MOVIES_PATH}:/media/movies:ro
-    devices:
-      - /dev/ttyUSB0:/dev/ttyUSB0
+        #devices:
+        #  - /dev/ttyUSB0:/dev/ttyUSB0
     restart: unless-stopped
     privileged: true
     ports:
@@ -45,7 +47,59 @@ services:
       - 1900:1900/udp  # SSDP for discovery (consider macvlan approach if breaking)
       - 5353:5353/udp  # mDNS for discovery
     depends_on:
-      - zigbee2mqtt
+      zigbee2mqtt:
+        condition: service_started
+      ha-postgres:
+        condition: service_healthy
+
+  # Postgres backing store for the HA recorder. On LOCAL disk (not NFS) on
+  # purpose: SQLite on the NFS /config volume was the likely cause of the
+  # recurring recorder DB corruption. See notes.txt / migration runbook.
+  ha-postgres:
+    image: postgres:16-alpine
+    container_name: ha-postgres
+    environment:
+      - POSTGRES_USER=homeassistant
+      - POSTGRES_DB=homeassistant
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - ha_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U homeassistant -d homeassistant"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Automated DB backup sidecar (standardized across services). Runs backup.sh on
+  # BACKUP_CRON_SCHEDULE via dcron + once at startup. Dumps are Postgres custom-format
+  # (.dump) and land on ha_backups (NFS/NAS), alongside HA's native config tars.
+  # Manual ops:
+  #   docker compose exec ha-postgres-backup /scripts/backup.sh                 # back up now
+  #   docker compose exec ha-postgres-backup ls -lh /backups/                   # list dumps
+  #   docker compose exec ha-postgres-backup /scripts/restore_db.sh /backups/home-assistant_db_YYYY-MM-DD_HH-MM-SS.dump
+  #   (stop the homeassistant container before a live restore, restart it after)
+  ha-postgres-backup:
+    image: postgres:16-alpine
+    container_name: ha-postgres-backup
+    restart: unless-stopped
+    depends_on:
+      ha-postgres:
+        condition: service_healthy
+    environment:
+      - SERVICE_NAME=home-assistant
+      - POSTGRES_HOST=ha-postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=homeassistant
+      - POSTGRES_USER=homeassistant
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - BACKUP_DIR=/backups
+      - BACKUP_RETENTION_DAYS=${BACKUP_RETENTION_DAYS:-30}
+      - BACKUP_CRON_SCHEDULE=${BACKUP_CRON_SCHEDULE:-0 3 * * *}
+    volumes:
+      - ha_backups:/backups
+      - ./scripts:/scripts:ro
+    command: ["sh", "/scripts/backup-entrypoint.sh"]
 
   appdaemon:
     build: ./appdaemon
@@ -56,3 +110,32 @@ services:
       - HA_URL=${HA_URL}
       - TOKEN=${HA_TOKEN}
     restart: unless-stopped
+
+volumes:
+  ha_data:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: ${NFS_OPTIONS}
+      device: ${NAS_HA_PATH}
+  ha_zigbee2mqtt:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: ${NFS_OPTIONS}
+      device: ${NAS_ZIGBEE_PATH}
+  ha_backups:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: ${NFS_OPTIONS}
+      device: ${NAS_HA_BACKUP_PATH}
+  ha_zigbee2mqtt_backups:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: ${NFS_OPTIONS}
+      device: ${NAS_ZIGBEE_BACKUP_PATH}
+  # Local-disk volume for the HA recorder Postgres (deliberately NOT NFS).
+  ha_pg_data:
+    driver: local
