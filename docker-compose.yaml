@@ -1,6 +1,6 @@
 services:
   mqtt:
-    image: eclipse-mosquitto:2.0
+    image: eclipse-mosquitto:2.1.2
     container_name: mqtt
     volumes:
       - "./mosquitto-data:/mosquitto"
@@ -11,7 +11,7 @@ services:
     restart: unless-stopped
 
   zigbee2mqtt:
-    image: koenkk/zigbee2mqtt:2.7
+    image: koenkk/zigbee2mqtt:2.12.0
     container_name: zigbee2mqtt
     volumes:
       #- ./zigbee2mqtt-data:/app/data
@@ -30,7 +30,7 @@ services:
   homeassistant:
     container_name: homeassistant
       # image: ghcr.io/home-assistant/home-assistant:2026.3.2
-    image: ghcr.io/home-assistant/home-assistant:2026.4.1
+    image: ghcr.io/home-assistant/home-assistant:2026.6.4
     volumes:
       - ha_data:/config
       - ha_backups:/backups
@@ -101,15 +101,15 @@ services:
       - ./scripts:/scripts:ro
     command: ["sh", "/scripts/backup-entrypoint.sh"]
 
-  appdaemon:
-    build: ./appdaemon
-    container_name: appdaemon
-    volumes:
-      - ./appdaemon:/conf
-    environment:
-      - HA_URL=${HA_URL}
-      - TOKEN=${HA_TOKEN}
-    restart: unless-stopped
+      #  appdaemon:
+      #    build: ./appdaemon
+      #    container_name: appdaemon
+      #    volumes:
+      #      - ./appdaemon:/conf
+      #    environment:
+      #      - HA_URL=${HA_URL}
+      #      - TOKEN=${HA_TOKEN}
+      #    restart: unless-stopped
 
 volumes:
   ha_data:
