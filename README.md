@@ -103,3 +103,29 @@ docker compose up -d
 - Only `web` network (172.22.0.0/16) trusted as reverse proxy
 - Enable 2FA for additional protection
 - No ports directly exposed to internet
+
+## Docker Container Access to Additional VLANs
+
+**Problem:** Docker containers on bridge networks cannot reach devices on VLANs other than the host's primary subnet.
+
+**Solution:** Add static route on Docker host. Bridge network containers automatically inherit the host's routing table.
+
+**Steps:**
+
+1. **Add temporary route to test:**
+```bash
+   sudo ip route add <VLAN_SUBNET>/24 via <ROUTER_IP>
+```
+
+2. **Make permanent (Ubuntu/Netplan):**
+   Edit `/etc/netplan/*.yaml` and add to routes section:
+```yaml
+   routes:
+     - to: <VLAN_SUBNET>/24
+       via: <ROUTER_IP>
+```
+   Apply: `sudo netplan apply`
+
+3. **Configure router firewall:** Allow traffic between subnets as needed.
+
+Note: Containers on Docker bridge networks use the host's routing table - no special network modes required.
