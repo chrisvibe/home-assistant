@@ -1,7 +1,7 @@
 # Home Assistant — Emergency Runbook
 
-**Current versions:** HA 2026.6.4 · Zigbee2MQTT 2.12.0 · Mosquitto 2.0.22 · Postgres 16-alpine  
-**Previous versions:** HA 2026.4.1 · Zigbee2MQTT 2.7
+**Current versions:** HA 2026.7.2 · Zigbee2MQTT 2.12.0 · Mosquitto 2.0.22 · Postgres 16-alpine  
+**Previous versions:** HA 2026.6.4 · Zigbee2MQTT 2.7
 
 ---
 
@@ -22,7 +22,7 @@ Containers: `homeassistant` · `ha-postgres` · `ha-postgres-backup` · `zigbee2
 ```bash
 git log --oneline -5 docker-compose.yaml
 
-sed -i 's|home-assistant:2026.6.4|home-assistant:2026.4.1|' docker-compose.yaml
+sed -i 's|home-assistant:2026.7.2|home-assistant:2026.6.4|' docker-compose.yaml
 docker compose pull homeassistant
 docker compose up -d homeassistant
 docker compose logs -f homeassistant
