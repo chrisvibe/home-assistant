@@ -1,7 +1,7 @@
 # Home Assistant — Emergency Runbook
 
-**Current versions:** HA 2026.7.2 · Zigbee2MQTT 2.12.0 · Mosquitto 2.0.22 · Postgres 16-alpine  
-**Previous versions:** HA 2026.6.4 · Zigbee2MQTT 2.7
+**Current versions:** HA 2026.7.2 · Zigbee2MQTT 2.12.1 · Mosquitto 2.0.22 · Postgres 16-alpine  
+**Previous versions:** HA 2026.6.4 · Zigbee2MQTT 2.12.0
 
 ---
 
