@@ -29,8 +29,8 @@ services:
 
   homeassistant:
     container_name: homeassistant
-      # image: ghcr.io/home-assistant/home-assistant:2026.6.4
-    image: ghcr.io/home-assistant/home-assistant:2026.7.2
+      # image: ghcr.io/home-assistant/home-assistant:2026.7.2
+    image: ghcr.io/home-assistant/home-assistant:2026.7.4
     volumes:
       - ha_data:/config
       - ha_backups:/backups
