@@ -13,7 +13,19 @@ curl -sf http://localhost:8123 && echo OK
 docker compose logs --tail=30 homeassistant
 ```
 
-Containers: `homeassistant` · `ha-postgres` · `ha-postgres-backup` · `zigbee2mqtt` · `mqtt`
+Containers: `homeassistant` · `ha-postgres` · `ha-postgres-backup` · `zigbee2mqtt` · `zigbee2mqtt-backup` · `mqtt`
+
+**Where the data lives** (matters when the NAS is down):
+
+| What | Where | Survives elephant being off? |
+|---|---|---|
+| HA config `/config` | NFS on elephant | no — HA will not start |
+| HA recorder DB | local disk (`home-assistant_ha_pg_data`) | yes |
+| Zigbee state `/app/data` | local disk (`zigbee2mqtt_data`) | yes |
+| all backups | NFS on elephant | no — sidecars fail to start, nothing else affected |
+
+So with the NAS down, **Zigbee and the lights keep working and Home Assistant does not.**
+The backup sidecars will restart-loop until the NAS is back; that is expected and harmless.
 
 ---
 
@@ -50,6 +62,38 @@ docker compose exec ha-postgres-backup ls -lh /backups/
 docker compose stop homeassistant
 docker compose exec ha-postgres-backup /scripts/restore_db.sh /backups/home-assistant_db_YYYY-MM-DD_HH-MM-SS.dump
 docker compose start homeassistant
+```
+
+---
+
+## Restore Zigbee2MQTT state from backup
+
+> `coordinator_backup.json` (network key + PAN) and `database.db` (device registry).
+> Losing these means re-pairing every device by hand — this is the one to get right.
+> Backups are nightly tar.gz on the NAS, named `zigbee2mqtt_state_*.tar.gz`.
+
+```bash
+docker compose exec zigbee2mqtt-backup ls -lh /backups/
+
+# STOP z2m first — it rewrites database.db and would overwrite the restore.
+docker compose stop zigbee2mqtt
+
+docker run --rm \
+    -v zigbee2mqtt_data:/data \
+    -v zigbee2mqtt_backups:/backups:ro \
+    -v "$PWD/zigbee2mqtt/scripts:/scripts:ro" \
+    alpine:3.22 sh /scripts/restore.sh /backups/zigbee2mqtt_state_YYYY-MM-DD_HH-MM-SS.tar.gz
+
+docker compose start zigbee2mqtt
+```
+
+The restore snapshots the current state to `/data/.pre-restore-<timestamp>.tar.gz` first,
+so restoring from the wrong file is itself undoable.
+
+Back up right now, off-schedule:
+
+```bash
+docker compose exec zigbee2mqtt-backup /scripts/backup.sh
 ```
 
 ---
