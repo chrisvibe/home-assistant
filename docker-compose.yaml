@@ -72,9 +72,12 @@ services:
       - 1400:1400 # sonos event subscriptions
       - 1900:1900/udp  # SSDP for discovery (consider macvlan approach if breaking)
       - 5353:5353/udp  # mDNS for discovery
+    # NO depends_on zigbee2mqtt, deliberately -- do not add it back. Home Assistant
+    # reaches the Zigbee mesh through the MQTT broker, never by talking to zigbee2mqtt
+    # directly, so it has nothing to wait for. With the dependency in place, a
+    # zigbee2mqtt that could not start took Home Assistant down with it, which is the
+    # opposite of what you want: the mesh is the durable layer, HA is the app on top.
     depends_on:
-      zigbee2mqtt:
-        condition: service_started
       ha-postgres:
         condition: service_healthy
 
