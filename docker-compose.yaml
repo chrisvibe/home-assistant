@@ -101,4 +101,3 @@ volumes:
       device: ${NAS_HA_BACKUP_PATH}
   # Local-disk volume for the HA recorder Postgres (deliberately NOT NFS).
   ha_pg_data:
-    driver: local
