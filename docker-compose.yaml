@@ -1,58 +1,4 @@
 services:
-  mqtt:
-    image: eclipse-mosquitto:2.0.22
-    container_name: mqtt
-    volumes:
-      - "./mosquitto-data:/mosquitto"
-    ports:
-      - "1883:1883"  # unencypted mqtt
-      - "9001:9001"  # HTTP/Websocket protocol
-    command: "mosquitto -c /mosquitto/mosquitto-auth.conf" # overrrides default conf file from image with file in volume
-    restart: unless-stopped
-
-  zigbee2mqtt:
-    image: koenkk/zigbee2mqtt:2.12.1
-    container_name: zigbee2mqtt
-    volumes:
-      #- ./zigbee2mqtt-data:/app/data
-      - z2m_data:/app/data
-      - /run/udev:/run/udev:ro
-    ports:
-      - 8080:8080
-    environment:
-      - TZ=Europe/Berlin
-    devices:
-      - /dev/ttyUSB0:/dev/ttyUSB0
-    restart: unless-stopped
-    depends_on:
-      - mqtt
-
-  # Backup sidecar for the Zigbee2MQTT state. Mirrors the ha-postgres-backup pattern
-  # (dcron + backup-entrypoint.sh + one run at startup) but backs up FILES, not a DB.
-  # Dumps land on z2m_backups, which IS on the NAS: live data local, backups off-box.
-  # DELIBERATELY no depends_on in either direction. If elephant is down this container
-  # fails to start and the Zigbee mesh keeps running regardless -- that independence is
-  # the whole point of the change, so do not "tidy" a depends_on in here later.
-  # /data is mounted read-only: a backup process must not be able to corrupt the thing
-  # it is backing up. Restores are a deliberate one-off, see scripts/restore.sh.
-  zigbee2mqtt-backup:
-    image: alpine:3.22
-    container_name: zigbee2mqtt-backup
-    restart: unless-stopped
-    environment:
-      - SERVICE_NAME=zigbee2mqtt
-      - DATA_DIR=/data
-      - BACKUP_DIR=/backups
-      - BACKUP_RETENTION_DAYS=${BACKUP_RETENTION_DAYS:-30}
-      # Own cron var, not the shared BACKUP_CRON_SCHEDULE: 03:20 keeps this clear of the
-      # 03:00 Postgres dump so the two are not writing to the NAS at the same moment.
-      - BACKUP_CRON_SCHEDULE=${ZIGBEE_BACKUP_CRON_SCHEDULE:-20 3 * * *}
-    volumes:
-      - z2m_data:/data:ro
-      - z2m_backups:/backups
-      - ./zigbee2mqtt/scripts:/scripts:ro
-    command: ["sh", "/scripts/backup-entrypoint.sh"]
-
   homeassistant:
     container_name: homeassistant
       # image: ghcr.io/home-assistant/home-assistant:2026.7.2
@@ -153,27 +99,6 @@ volumes:
       type: nfs
       o: ${NFS_OPTIONS}
       device: ${NAS_HA_BACKUP_PATH}
-  # Zigbee2MQTT live state on LOCAL disk, deliberately NOT NFS -- same reasoning as
-  # ha_pg_data below. database.db and state.json are written continuously and the NFS
-  # mounts are `soft`, so a NAS blip returns EIO mid-write instead of blocking; that is
-  # the failure mode that corrupted the SQLite recorder. It also means the Zigbee mesh
-  # starts and runs with elephant switched off, which it previously could not.
-  #
-  # Explicit `name:` pins the volume identity so it does NOT carry the compose project
-  # as a prefix. That is what lets these services move to their own compose project
-  # without the data having to move with them.
-  z2m_data:
-    name: zigbee2mqtt_data
-    driver: local
-  # ...and the backups DO go to the NAS, so the state exists on a second machine.
-  # This is the inversion the recorder migration made: live local, backups off-box.
-  z2m_backups:
-    name: zigbee2mqtt_backups
-    driver: local
-    driver_opts:
-      type: nfs
-      o: ${NFS_OPTIONS}
-      device: ${NAS_ZIGBEE_BACKUP_PATH}
   # Local-disk volume for the HA recorder Postgres (deliberately NOT NFS).
   ha_pg_data:
     driver: local

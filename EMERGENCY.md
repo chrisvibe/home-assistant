@@ -1,7 +1,12 @@
 # Home Assistant — Emergency Runbook
 
-**Current versions:** HA 2026.7.4 · Zigbee2MQTT 2.12.1 · Mosquitto 2.0.22 · Postgres 16-alpine  
-**Previous versions:** HA 2026.7.2 · Zigbee2MQTT 2.12.0
+**Current versions:** HA 2026.7.4 · Postgres 16-alpine  
+**Previous versions:** HA 2026.7.2
+
+> Zigbee2MQTT and the MQTT broker moved to their own compose project on
+> 2026-08-28. For anything about the mesh, the broker, or restoring Zigbee
+> state, see `../zigbee/EMERGENCY.md` — and run those commands from
+> `~/self-hosting/services/zigbee`, not from here.
 
 ---
 
@@ -13,7 +18,7 @@ curl -sf http://localhost:8123 && echo OK
 docker compose logs --tail=30 homeassistant
 ```
 
-Containers: `homeassistant` · `ha-postgres` · `ha-postgres-backup` · `zigbee2mqtt` · `zigbee2mqtt-backup` · `mqtt`
+Containers: `homeassistant` · `ha-postgres` · `ha-postgres-backup`
 
 **Where the data lives** (matters when the NAS is down):
 
@@ -21,11 +26,11 @@ Containers: `homeassistant` · `ha-postgres` · `ha-postgres-backup` · `zigbee2
 |---|---|---|
 | HA config `/config` | NFS on elephant | no — HA will not start |
 | HA recorder DB | local disk (`home-assistant_ha_pg_data`) | yes |
-| Zigbee state `/app/data` | local disk (`zigbee2mqtt_data`) | yes |
 | all backups | NFS on elephant | no — sidecars fail to start, nothing else affected |
 
-So with the NAS down, **Zigbee and the lights keep working and Home Assistant does not.**
-The backup sidecars will restart-loop until the NAS is back; that is expected and harmless.
+So with the NAS down, **Home Assistant does not start, and the Zigbee mesh keeps
+working anyway** — that separation is the entire point of the two projects.
+The backup sidecars will restart-loop until the NAS is back; expected, harmless.
 
 ---
 
@@ -34,27 +39,19 @@ The backup sidecars will restart-loop until the NAS is back; that is expected an
 ```bash
 git log --oneline -5 docker-compose.yaml
 
-sed -i 's|home-assistant:2026.7.2|home-assistant:2026.6.4|' docker-compose.yaml
+sed -i 's|home-assistant:2026.7.4|home-assistant:2026.7.2|' docker-compose.yaml
 docker compose pull homeassistant
 docker compose up -d homeassistant
 docker compose logs -f homeassistant
-```
-
-## Rollback Zigbee2MQTT
-
-```bash
-sed -i 's|zigbee2mqtt:2.12.0|zigbee2mqtt:2.7|' docker-compose.yaml
-docker compose pull zigbee2mqtt
-docker compose up -d zigbee2mqtt
-docker compose logs -f zigbee2mqtt
 ```
 
 ---
 
 ## Restore HA Postgres from backup
 
-> HA config (automations, scripts) lives on NAS (`ha_data` volume) — survives restarts.  
-> This restore is only needed if the recorder DB (history/stats) is corrupt.
+> HA config (automations, scripts) lives on the NAS (`ha_data` volume) and
+> survives restarts. This restore is only needed if the recorder DB
+> (history/stats) is corrupt.
 
 ```bash
 docker compose exec ha-postgres-backup ls -lh /backups/
@@ -66,47 +63,22 @@ docker compose start homeassistant
 
 ---
 
-## Restore Zigbee2MQTT state from backup
+## Home Assistant cannot reach MQTT
 
-> `coordinator_backup.json` (network key + PAN) and `database.db` (device registry).
-> Losing these means re-pairing every device by hand — this is the one to get right.
-> Backups are nightly tar.gz on the NAS, named `zigbee2mqtt_state_*.tar.gz`.
+HA resolves the broker as `mqtt` over the external `mesh` network. Both
+containers must be attached to it:
 
 ```bash
-docker compose exec zigbee2mqtt-backup ls -lh /backups/
-
-# STOP z2m first — it rewrites database.db and would overwrite the restore.
-docker compose stop zigbee2mqtt
-
-docker run --rm \
-    -v zigbee2mqtt_data:/data \
-    -v zigbee2mqtt_backups:/backups:ro \
-    -v "$PWD/zigbee2mqtt/scripts:/scripts:ro" \
-    alpine:3.22 sh /scripts/restore.sh /backups/zigbee2mqtt_state_YYYY-MM-DD_HH-MM-SS.tar.gz
-
-docker compose start zigbee2mqtt
+docker network inspect mesh --format '{{range .Containers}}{{.Name}} {{end}}'
+docker exec homeassistant getent hosts mqtt
 ```
 
-The restore snapshots the current state to `/data/.pre-restore-<timestamp>.tar.gz` first,
-so restoring from the wrong file is itself undoable.
-
-Back up right now, off-schedule:
+If `mesh` is missing, recreate it and bring both projects back up:
 
 ```bash
-docker compose exec zigbee2mqtt-backup /scripts/backup.sh
-```
-
----
-
-## Zigbee devices not responding
-
-```bash
-# Check USB stick is visible:
-ls -la /dev/ttyUSB0
-
-# If missing: physically reseat the stick, then:
-docker compose restart zigbee2mqtt
-docker compose logs --tail=30 zigbee2mqtt
+docker network create mesh
+docker compose up -d                                  # from services/home-assistant
+docker compose up -d                                  # and from services/zigbee
 ```
 
 ---
