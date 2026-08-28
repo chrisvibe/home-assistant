@@ -7,7 +7,7 @@ services:
     ports:
       - "1883:1883"  # unencypted mqtt
       - "9001:9001"  # HTTP/Websocket protocol
-    command: "mosquitto -c /mosquitto/mosquitto-no-auth.conf" # overrrides default conf file from image with file in volume
+    command: "mosquitto -c /mosquitto/mosquitto-auth.conf" # overrrides default conf file from image with file in volume
     restart: unless-stopped
 
   zigbee2mqtt:
